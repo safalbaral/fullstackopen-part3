@@ -2,6 +2,12 @@ const express = require('express');
 const morgan = require('morgan')
 const cors = require('cors')
 
+// Need to import dotenv before Entry
+
+require('dotenv').config()
+
+const Entry = require('./models/entry')
+
 const app = express()
 app.use(express.static('dist'))
 app.use(cors())
@@ -39,31 +45,32 @@ const generateRandomId = () => {
   }
   
 app.get('/api/persons', (request, response) => {
-    response.json(entries)
+    Entry.find({}).then(entries => {
+        response.json(entries)
+    })
 })
 
 app.get('/api/persons/:id', (request, response) => {
-    const id = Number(request.params.id);
-    const entry = entries.find(entry => entry.id === id)
-    entry ? response.json(entry) : response.status(404).end()
+    Entry.findById(request.params.id).then(note => response.json(note))
 })
 
 app.post('/api/persons', (request, response) => {  
-    const entry = request.body //This is made only possible by the json middleware   
-    if (entries.find(e => e.name === entry.name)) {
-        response.status(403).json({
-            error: 'Name must be unique'
-        })
-    } else if (entry.name === '') {
-        response.status(400).json({
+    const body = request.body //This is made only possible by the json middleware   
+
+    if (body.name === '') {
+        return response.status(400).json({
             error: 'The name field must not be blank'
-        }
-        )
-    } else {
-        entry.id = generateRandomId()
-        entries = entries.concat(entry)
-        response.json(entry)
+        })
     }
+
+    const entry = new Entry({
+        name: body.name,
+        number: body.number
+    })
+
+    entry.save().then(savedEntry => {
+        response.json(savedEntry)
+    })
 })
 
 app.delete('/api/persons/:id', (request, response) => {
