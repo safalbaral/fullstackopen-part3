@@ -3,16 +3,15 @@ const morgan = require('morgan')
 const cors = require('cors')
 
 // Need to import dotenv before Entry
-
 require('dotenv').config()
-
 const Entry = require('./models/entry')
 
 const app = express()
+
 app.use(express.static('dist'))
 app.use(cors())
-app.use(express.static('dist'))
 app.use(express.json())
+
 morgan.token('body', function (req, res) { return JSON.stringify(req.body) })
 app.use(morgan(':method :url :status :res[content-length] - :response-time ms :body'))
 
@@ -51,7 +50,14 @@ app.get('/api/persons', (request, response) => {
 })
 
 app.get('/api/persons/:id', (request, response) => {
-    Entry.findById(request.params.id).then(note => response.json(note))
+    Entry.findById(request.params.id).then(entry => {
+        if (entry){
+            response.json(entry)
+        } else {
+            response.status(404).end()
+        }
+    })
+    .catch(error => next(error))
 })
 
 app.post('/api/persons', (request, response) => {  
@@ -74,14 +80,46 @@ app.post('/api/persons', (request, response) => {
 })
 
 app.delete('/api/persons/:id', (request, response) => {
+    Entry.findByIdAndDelete(request.params.id)
+    .then(result => {
+        response.status(204).end()
+    })
+    .catch(error => next(error))
+
     const id = Number(request.params.id);
     entries = entries.filter(entry => entry.id !== id)
     response.status(204).end()
 })
 
+app.put('/api/persons/:id', (request, response) => {
+    const body = request.body
+
+    const entry = {
+        name: body.name,
+        number: body.number
+    }
+
+    Entry.findByIdAndUpdate(request.params.id, entry, {new: true}) // {new:true} ensures that the entry provided to the callback funciton is the updated entry and not the old one, which is the default behavior
+        .then(updatedEntry => {
+            response.json(updatedEntry)
+        }).catch(error => next(error))
+})
+
 app.get('/info', (request, response) => {
     response.send(`Phonebook has info for ${entries.length} people. <br /> ${Date()}`)
 })
+
+const errorHandler = (error, request, response, next) => {
+    console.log(error.message)
+
+    if (error.name === 'Cast Error') {
+        return response.status(400).send({
+            error: 'Malformatted ID'
+        })
+    }
+
+    next(error)
+}
 
 const PORT = process.env.PORT || 3001
 
