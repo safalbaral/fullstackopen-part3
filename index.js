@@ -60,14 +60,8 @@ app.get('/api/persons/:id', (request, response) => {
     .catch(error => next(error))
 })
 
-app.post('/api/persons', (request, response) => {  
+app.post('/api/persons', (request, response, next) => {  
     const body = request.body //This is made only possible by the json middleware   
-
-    if (body.name === '') {
-        return response.status(400).json({
-            error: 'The name field must not be blank'
-        })
-    }
 
     const entry = new Entry({
         name: body.name,
@@ -76,10 +70,10 @@ app.post('/api/persons', (request, response) => {
 
     entry.save().then(savedEntry => {
         response.json(savedEntry)
-    })
+    }).catch(error => next(error))
 })
 
-app.delete('/api/persons/:id', (request, response) => {
+app.delete('/api/persons/:id', (request, response, next) => {
     Entry.findByIdAndDelete(request.params.id)
     .then(result => {
         response.status(204).end()
@@ -91,7 +85,7 @@ app.delete('/api/persons/:id', (request, response) => {
     response.status(204).end()
 })
 
-app.put('/api/persons/:id', (request, response) => {
+app.put('/api/persons/:id', (request, response, next) => {
     const body = request.body
 
     const entry = {
@@ -99,7 +93,7 @@ app.put('/api/persons/:id', (request, response) => {
         number: body.number
     }
 
-    Entry.findByIdAndUpdate(request.params.id, entry, {new: true}) // {new:true} ensures that the entry provided to the callback funciton is the updated entry and not the old one, which is the default behavior
+    Entry.findByIdAndUpdate(request.params.id, entry, {new: true, runValidators: true, context: 'query'}) // {new:true} ensures that the entry provided to the callback funciton is the updated entry and not the old one, which is the default behavior
         .then(updatedEntry => {
             response.json(updatedEntry)
         }).catch(error => next(error))
@@ -112,14 +106,22 @@ app.get('/info', (request, response) => {
 const errorHandler = (error, request, response, next) => {
     console.log(error.message)
 
-    if (error.name === 'Cast Error') {
+    console.log('ERROR NAME IS', error.name)
+
+    if (error.name === 'CastError') {
         return response.status(400).send({
             error: 'Malformatted ID'
+        })
+    } else if (error.name === 'ValidationError') {
+        return response.status(400).json({
+            error: error.message
         })
     }
 
     next(error)
 }
+
+app.use(errorHandler)
 
 const PORT = process.env.PORT || 3001
 
